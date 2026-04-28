@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HyperChat Alerts — Macdaking</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: transparent;
+      font-family: "Inter", "Segoe UI", Arial, sans-serif;
+    }
+
+    #hyperchat-macdaking-alerts {
+      --hc-brand: #bb1b1b;
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .hc-card {
+      border: 1px solid rgba(187,27,27,0.48);
+      color: #fff;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(187,27,27,0.42), transparent 48%),
+        radial-gradient(circle at 88% 100%, rgba(255,255,255,0.08), transparent 42%),
+        linear-gradient(145deg, rgba(17,8,10,0.94), rgba(5,4,6,0.97));
+      box-shadow:
+        0 8px 32px rgba(0,0,0,0.7),
+        0 0 0 1px rgba(255,255,255,0.05) inset,
+        0 0 40px rgba(187,27,27,0.28);
+      box-sizing: border-box;
+      position: absolute;
+      pointer-events: all;
+      user-select: none;
+    }
+
+    .hc-leaderboard {
+      top: 24px; left: 24px;
+      width: 280px;
+      min-width: 160px; min-height: 60px;
+      padding: 10px 14px 14px;
+      border-radius: 12px;
+      cursor: grab;
+      container-type: inline-size;
+      container-name: lb;
+    }
+
+    .hc-leaderboard.hc-dragging { cursor: grabbing; }
+
+    .hc-alert-card {
+      bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(20px) scale(0.96);
+      width: 300px;
+      min-width: 180px; min-height: 60px;
+      padding: 12px 16px 14px;
+      border-radius: 14px;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 380ms ease, transform 460ms cubic-bezier(0.19,1,0.22,1);
+      container-type: inline-size;
+      container-name: alert;
+    }
+
+    .hc-alert-card.hc-visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1);
+    }
+
+    .hc-alert-card.hc-edit-mode {
+      opacity: 1 !important;
+      transform: translateX(-50%) translateY(0) scale(1) !important;
+      pointer-events: all !important;
+      cursor: grab;
+      transition: none;
+      border-color: rgba(187,27,27,0.9) !important;
+      box-shadow:
+        0 8px 32px rgba(0,0,0,0.7),
+        0 0 0 2px rgba(187,27,27,0.6),
+        0 0 40px rgba(187,27,27,0.5) !important;
+    }
+
+    .hc-alert-card.hc-edit-mode.hc-dragging { cursor: grabbing; }
+
+    .hc-alert-card.hc-absolute { transform: none !important; }
+    .hc-alert-card.hc-absolute.hc-visible { transform: none !important; }
+
+    .hc-alert-card::before {
+      content: "";
+      position: absolute;
+      left: 10px; right: 10px; top: 0;
+      height: 1.5px;
+      background: linear-gradient(90deg, transparent, #bb1b1b, #fff, #bb1b1b, transparent);
+      opacity: 0.85;
+    }
+
+    .hc-drag-hint {
+      position: absolute;
+      top: 5px; left: 8px;
+      display: grid;
+      grid-template-columns: repeat(3, 2px);
+      gap: 2px;
+      opacity: 0;
+      transition: opacity 160ms;
+      pointer-events: none;
+    }
+
+    .hc-leaderboard:hover .hc-drag-hint,
+    .hc-alert-card.hc-edit-mode:hover .hc-drag-hint { opacity: 0.4; }
+
+    .hc-drag-hint span {
+      display: block; width: 2px; height: 2px;
+      border-radius: 50%; background: #fff;
+    }
+
+    .hc-resize-handle {
+      position: absolute;
+      bottom: 0; right: 0;
+      width: 18px; height: 18px;
+      cursor: se-resize;
+      display: flex;
+      align-items: flex-end; justify-content: flex-end;
+      padding: 4px; box-sizing: border-box;
+    }
+
+    .hc-resize-handle svg { opacity: 0.35; transition: opacity 160ms; }
+    .hc-leaderboard:hover .hc-resize-handle svg,
+    .hc-alert-card.hc-edit-mode:hover .hc-resize-handle svg { opacity: 0.8; }
+
+    .hc-dblclick-hint {
+      position: absolute;
+      bottom: 5px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 8px; font-weight: 700; letter-spacing: 0.08em;
+      color: rgba(255,205,205,0.45);
+      white-space: nowrap;
+      opacity: 0; transition: opacity 200ms;
+      pointer-events: none;
+    }
+
+    .hc-leaderboard:hover .hc-dblclick-hint { opacity: 1; }
+
+    .hc-edit-label {
+      position: absolute;
+      top: 5px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 8px; font-weight: 800; letter-spacing: 0.1em;
+      color: rgba(255,180,180,0.75);
+      white-space: nowrap; display: none;
+    }
+
+    .hc-alert-card.hc-edit-mode .hc-edit-label { display: block; }
+
+    .hc-lb-row {
+      display: flex; align-items: center;
+      justify-content: space-between; gap: 8px;
+    }
+
+    .hc-lb-label {
+      color: rgba(255,205,205,0.9);
+      font-size: 9px; font-weight: 900;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      white-space: nowrap; flex-shrink: 0;
+    }
+
+    .hc-lb-value {
+      display: flex; align-items: baseline;
+      justify-content: flex-end; gap: 6px;
+      min-width: 0; color: #fff; font-weight: 900; text-align: right;
+    }
+
+    .hc-lb-name {
+      max-width: 120px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-size: 12px;
+    }
+
+    .hc-lb-amount {
+      font-size: 11px;
+      text-shadow: 0 0 10px rgba(187,27,27,0.9);
+      white-space: nowrap; flex-shrink: 0;
+    }
+
+    .hc-lb-divider {
+      height: 1px; margin: 7px 0;
+      background: linear-gradient(90deg, transparent, rgba(187,27,27,0.55), transparent);
+    }
+
+    .hc-lb-rotating {
+      opacity: 1; transform: translateX(0);
+      transition: opacity 260ms ease, transform 260ms ease;
+    }
+
+    .hc-lb-rotating.hc-changing { opacity: 0; transform: translateX(8px); }
+
+    @container lb (min-width: 260px) {
+      .hc-lb-label { font-size: 11px; }
+      .hc-lb-name  { font-size: 15px; max-width: 180px; }
+      .hc-lb-amount { font-size: 14px; }
+    }
+
+    @container lb (min-width: 380px) {
+      .hc-lb-label { font-size: 13px; }
+      .hc-lb-name  { font-size: 18px; max-width: 240px; }
+      .hc-lb-amount { font-size: 16px; }
+      .hc-lb-divider { margin: 12px 0; }
+    }
+
+    @container lb (min-width: 500px) {
+      .hc-lb-label { font-size: 14px; letter-spacing: 0.12em; }
+      .hc-lb-name  { font-size: 20px; max-width: 300px; }
+      .hc-lb-amount { font-size: 18px; }
+    }
+
+    .hc-kicker {
+      margin-bottom: 4px;
+      color: rgba(255,205,205,0.9);
+      font-size: 8px; font-weight: 800; letter-spacing: 0.18em;
+    }
+
+    .hc-mainline {
+      display: flex; align-items: baseline;
+      justify-content: center; flex-wrap: wrap;
+      gap: 6px; font-weight: 900;
+    }
+
+    #hc-donor-name {
+      max-width: 200px; overflow-wrap: anywhere;
+      font-size: 16px; line-height: 1.1;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    }
+
+    .hc-dot { color: rgba(255,255,255,0.3); font-size: 12px; }
+
+    #hc-amount {
+      color: #fff; font-size: 20px; line-height: 1;
+      text-shadow: 0 0 12px rgba(187,27,27,0.85);
+    }
+
+    .hc-message {
+      display: none; margin: 8px auto 0; max-width: 100%;
+      padding: 6px 10px;
+      border-left: 3px solid #bb1b1b; border-radius: 6px;
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.92);
+      font-size: 10px; line-height: 1.35;
+      overflow-wrap: anywhere; text-align: left;
+    }
+
+    .hc-message.hc-has-message { display: block; }
+
+    .hc-type {
+      position: absolute; top: 7px; right: 8px;
+      padding: 3px 6px;
+      border: 1px solid rgba(187,27,27,0.45); border-radius: 999px;
+      background: rgba(187,27,27,0.18);
+      color: rgba(255,255,255,0.88);
+      font-size: 7px; font-weight: 800; letter-spacing: 0.1em;
+    }
+
+    .hc-media-wrap { display: none; justify-content: center; margin: 0 auto 8px; }
+    .hc-media-wrap.hc-has-media { display: flex; }
+
+    .hc-media-wrap img, .hc-media-wrap video {
+      display: block; max-width: 100%; max-height: 120px;
+      object-fit: contain; border-radius: 8px;
+      border: 1px solid rgba(187,27,27,0.4);
+    }
+
+    @container alert (min-width: 280px) {
+      .hc-kicker     { font-size: 10px; margin-bottom: 5px; }
+      #hc-donor-name { font-size: 20px; max-width: 260px; }
+      .hc-dot        { font-size: 14px; }
+      #hc-amount     { font-size: 26px; }
+      .hc-message    { font-size: 13px; padding: 8px 12px; }
+      .hc-type       { font-size: 8px; top: 9px; right: 10px; }
+      .hc-media-wrap img, .hc-media-wrap video { max-height: 160px; }
+    }
+
+    @container alert (min-width: 420px) {
+      .hc-kicker     { font-size: 12px; letter-spacing: 0.2em; margin-bottom: 7px; }
+      #hc-donor-name { font-size: 26px; max-width: 340px; }
+      .hc-dot        { font-size: 18px; }
+      #hc-amount     { font-size: 34px; }
+      .hc-message    { font-size: 16px; padding: 10px 14px; margin-top: 12px; }
+      .hc-type       { font-size: 9px; top: 12px; right: 14px; padding: 4px 8px; }
+      .hc-media-wrap img, .hc-media-wrap video { max-height: 200px; }
+    }
+
+    @container alert (min-width: 580px) {
+      .hc-kicker     { font-size: 12px; margin-bottom: 8px; }
+      #hc-donor-name { font-size: 32px; max-width: 400px; }
+      .hc-dot        { font-size: 20px; }
+      #hc-amount     { font-size: 42px; }
+      .hc-message    { font-size: 18px; padding: 12px 16px; margin-top: 16px; }
+      .hc-type       { font-size: 10px; top: 14px; right: 16px; padding: 5px 9px; }
+      .hc-media-wrap img, .hc-media-wrap video { max-height: 210px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="hyperchat-macdaking-alerts">
+
+  <div class="hc-card hc-leaderboard" id="hc-leaderboard">
+    <div class="hc-drag-hint">
+      <span></span><span></span><span></span>
+      <span></span><span></span><span></span>
+    </div>
+    <div class="hc-lb-row">
+      <span class="hc-lb-label">Top</span>
+      <div class="hc-lb-value">
+        <span class="hc-lb-name" id="hc-top-donor-name">—</span>
+        <span class="hc-lb-amount" id="hc-top-donor-amount">₹0</span>
+      </div>
+    </div>
+    <div class="hc-lb-divider"></div>
+    <div class="hc-lb-row hc-lb-rotating" id="hc-recent-donation">
+      <span class="hc-lb-label">!hyperchat</span>
+      <div class="hc-lb-value">
+        <span class="hc-lb-name" id="hc-recent-donor-name">—</span>
+        <span class="hc-lb-amount" id="hc-recent-donor-amount">₹0</span>
+      </div>
+    </div>
+    <div class="hc-dblclick-hint">DBL-CLICK TO MOVE ALERT</div>
+    <div class="hc-resize-handle" id="hc-lb-resize">
+      <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+        <path d="M9 1L1 9M9 5L5 9" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="hc-card hc-alert-card" id="hc-alert-card">
+    <div class="hc-drag-hint">
+      <span></span><span></span><span></span>
+      <span></span><span></span><span></span>
+    </div>
+    <div class="hc-edit-label">EDIT MODE — DBL-CLICK TO LOCK</div>
+    <span class="hc-type" id="hc-type">MESSAGE</span>
+    <div class="hc-media-wrap" id="hc-media-wrap"></div>
+    <div class="hc-kicker">HYPERCHAT DONATION</div>
+    <div class="hc-mainline">
+      <span id="hc-donor-name">Anonymous</span>
+      <span class="hc-dot">·</span>
+      <span id="hc-amount">₹0</span>
+    </div>
+    <div class="hc-message" id="hc-message"></div>
+    <div class="hc-resize-handle" id="hc-alert-resize">
+      <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+        <path d="M9 1L1 9M9 5L5 9" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ── Persistence ── */
+  var STORAGE_KEY = 'hc_macdaking_layout_v1';
+
+  function saveLayout() {
+    var lb   = document.getElementById('hc-leaderboard');
+    var card = document.getElementById('hc-alert-card');
+    var layout = {
+      lb: {
+        left:      lb.style.left,
+        top:       lb.style.top,
+        width:     lb.style.width,
+        minHeight: lb.style.minHeight,
+      },
+      alert: {
+        left:      card.style.left,
+        top:       card.style.top,
+        width:     card.style.width,
+        minHeight: card.style.minHeight,
+        absolute:  card.classList.contains('hc-absolute'),
+      },
+    };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(layout)); } catch(e) {}
+  }
+
+  function loadLayout() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      var layout = JSON.parse(raw);
+      var lb   = document.getElementById('hc-leaderboard');
+      var card = document.getElementById('hc-alert-card');
+
+      if (layout.lb) {
+        if (layout.lb.left)      lb.style.left      = layout.lb.left;
+        if (layout.lb.top)       lb.style.top       = layout.lb.top;
+        if (layout.lb.width)     lb.style.width     = layout.lb.width;
+        if (layout.lb.minHeight) lb.style.minHeight = layout.lb.minHeight;
+      }
+
+      if (layout.alert && layout.alert.absolute) {
+        card.classList.add('hc-absolute');
+        if (layout.alert.left)      card.style.left      = layout.alert.left;
+        if (layout.alert.top)       card.style.top       = layout.alert.top;
+        if (layout.alert.width)     card.style.width     = layout.alert.width;
+        if (layout.alert.minHeight) card.style.minHeight = layout.alert.minHeight;
+        card.style.bottom    = 'auto';
+        card.style.right     = 'auto';
+        card.style.transform = 'none';
+      } else if (layout.alert) {
+        if (layout.alert.width)     card.style.width     = layout.alert.width;
+        if (layout.alert.minHeight) card.style.minHeight = layout.alert.minHeight;
+      }
+    } catch(e) {}
+  }
+
+  /* ── Drag & Resize ── */
+  function toAbsolute(el) {
+    var rect = el.getBoundingClientRect();
+    el.style.transform = 'none';
+    el.style.left      = rect.left + 'px';
+    el.style.top       = rect.top  + 'px';
+    el.style.bottom    = 'auto';
+    el.style.right     = 'auto';
+    el.style.width     = rect.width + 'px';
+    el.classList.add('hc-absolute');
+  }
+
+  function makeDraggable(el, resizeHandleEl) {
+    el.addEventListener('mousedown', function (e) {
+      if (resizeHandleEl && e.target.closest('#' + resizeHandleEl.id)) return;
+      e.preventDefault();
+      if (!el.classList.contains('hc-absolute')) toAbsolute(el);
+      var startX = e.clientX, startY = e.clientY;
+      var origLeft = parseFloat(el.style.left), origTop = parseFloat(el.style.top);
+      el.classList.add('hc-dragging');
+      function onMove(e) {
+        el.style.left = Math.max(0, origLeft + e.clientX - startX) + 'px';
+        el.style.top  = Math.max(0, origTop  + e.clientY - startY) + 'px';
+      }
+      function onUp() {
+        el.classList.remove('hc-dragging');
+        saveLayout();
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      }
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    });
+  }
+
+  function makeResizable(el, handle, minW, minH) {
+    handle.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!el.classList.contains('hc-absolute')) toAbsolute(el);
+      var startX = e.clientX, startY = e.clientY;
+      var origW = parseFloat(el.style.width)     || el.offsetWidth;
+      var origH = parseFloat(el.style.minHeight) || el.offsetHeight;
+      function onMove(e) {
+        el.style.width     = Math.max(minW, origW + e.clientX - startX) + 'px';
+        el.style.minHeight = Math.max(minH, origH + e.clientY - startY) + 'px';
+      }
+      function onUp() {
+        saveLayout();
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      }
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    });
+  }
+
+  /* ── Boot UI ── */
+  loadLayout();
+
+  var lb       = document.getElementById('hc-leaderboard');
+  var lbResize = document.getElementById('hc-lb-resize');
+  makeDraggable(lb, lbResize);
+  makeResizable(lb, lbResize, 160, 60);
+
+  var alertCard   = document.getElementById('hc-alert-card');
+  var alertResize = document.getElementById('hc-alert-resize');
+  var alertEditMode = false;
+
+  function enterAlertEditMode() {
+    alertEditMode = true;
+    alertCard.classList.add('hc-edit-mode');
+    if (!alertCard.classList.contains('hc-absolute')) toAbsolute(alertCard);
+  }
+
+  function exitAlertEditMode() {
+    alertEditMode = false;
+    alertCard.classList.remove('hc-edit-mode');
+    alertCard.style.pointerEvents = '';
+    saveLayout();
+  }
+
+  lb.addEventListener('dblclick', function (e) {
+    e.preventDefault();
+    alertEditMode ? exitAlertEditMode() : enterAlertEditMode();
+  });
+
+  alertCard.addEventListener('dblclick', function (e) {
+    e.preventDefault();
+    if (alertEditMode) exitAlertEditMode();
+  });
+
+  makeDraggable(alertCard, alertResize);
+  makeResizable(alertCard, alertResize, 180, 60);
+
+  alertCard.addEventListener('mousedown', function (e) {
+    if (!alertEditMode) e.stopPropagation();
+  }, true);
+
+  /* ── HyperChat Logic ── */
+  var LEADERBOARD_ENDPOINT   = 'https://vsevsjvtrshgeiudrnth.supabase.co/functions/v1/get-leaderboard-data';
+  var STREAMER_SLUG          = 'macdaking';
+  var ALERT_DURATION_MS      = 10000;
+  var LEADERBOARD_REFRESH_MS = 60000;
+  var LEADERBOARD_ROTATE_MS  = 5000;
+  var PUSHER_KEY             = '1928180819429852e991';
+  var PUSHER_CLUSTER         = 'ap2';
+  var ALERT_CHANNEL          = 'macdaking-alerts';
+  var DASHBOARD_CHANNEL      = 'macdaking-dashboard';
+  var ALERT_EVENT            = 'audio-now-playing';
+
+  var currentAlertTimer   = null;
+  var recentDonationIndex = 0;
+  var alertQueue          = [];
+  var seenDonationIds     = new Set();
+  var latestDonations     = [];
+  var topDonator          = null;
+
+  var $ = function(id){ return document.getElementById(id); };
+
+  function getCurrencySymbol(currency) {
+    var s = { INR:'₹', USD:'$', EUR:'€', GBP:'£', AED:'د.إ', AUD:'A$' };
+    return s[String(currency||'INR').toUpperCase()] || (currency+' ');
+  }
+
+  function formatAmount(amount, currency) {
+    return getCurrencySymbol(currency) + Number(amount||0).toLocaleString('en-IN');
+  }
+
+  function safeText(value, fallback) {
+    return String(value||fallback||'').trim() || (fallback||'');
+  }
+
+  function getAlertType(d) {
+    if (d && d.hypersound_url) return 'HYPERSOUND';
+    if (d && (d.voice_message_url||d.tts_audio_url)) return 'VOICE';
+    if (d && d.media_url) return 'MEDIA';
+    return 'MESSAGE';
+  }
+
+  function normalizeDonation(raw) {
+    if (!raw) return null;
+    return {
+      id: raw.id || ((raw.name||'donor')+'-'+(raw.created_at||Date.now())+'-'+(raw.amount||0)),
+      name: safeText(raw.name, 'Anonymous'),
+      amount: Number(raw.amount||raw.totalAmount||0),
+      currency: raw.currency||'INR',
+      created_at: raw.created_at||new Date().toISOString(),
+      message: raw.message||'',
+      media_url: raw.media_url||null,
+      media_type: raw.media_type||null,
+      hypersound_url: raw.hypersound_url||null,
+      voice_message_url: raw.voice_message_url||null,
+      tts_audio_url: raw.tts_audio_url||null,
+    };
+  }
+
+  function renderMedia(donation) {
+    var wrap = $('hc-media-wrap');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    wrap.classList.remove('hc-has-media');
+    if (!donation||!donation.media_url) return;
+    var isVideo = String(donation.media_type||'').toLowerCase().includes('video');
+    var el = document.createElement(isVideo?'video':'img');
+    el.src = donation.media_url;
+    if (isVideo) { el.autoplay=true; el.loop=true; el.muted=true; el.playsInline=true; }
+    else { el.alt='Donation media'; }
+    wrap.appendChild(el);
+    wrap.classList.add('hc-has-media');
+  }
+
+  function showNextAlert() {
+    if (!alertCard||alertCard.classList.contains('hc-visible')||alertQueue.length===0) return;
+    var d = alertQueue.shift();
+    $('hc-donor-name').textContent = safeText(d.name,'Anonymous');
+    $('hc-amount').textContent     = formatAmount(d.amount, d.currency);
+    $('hc-type').textContent       = getAlertType(d);
+    var body = safeText(d.message,'');
+    var msg  = $('hc-message');
+    msg.textContent = body;
+    msg.classList.toggle('hc-has-message', Boolean(body));
+    renderMedia(d);
+    alertCard.classList.add('hc-visible');
+    clearTimeout(currentAlertTimer);
+    currentAlertTimer = setTimeout(function() {
+      if (!alertEditMode) alertCard.classList.remove('hc-visible');
+      setTimeout(showNextAlert, 600);
+    }, ALERT_DURATION_MS);
+  }
+
+  function enqueueAlert(raw) {
+    var d = normalizeDonation(raw);
+    if (!d||!d.id||seenDonationIds.has(d.id)) return;
+    seenDonationIds.add(d.id);
+    alertQueue.push(d);
+    showNextAlert();
+    if (seenDonationIds.size>100) {
+      var recent = Array.from(seenDonationIds).slice(-50);
+      seenDonationIds.clear();
+      recent.forEach(function(id){ seenDonationIds.add(id); });
+    }
+  }
+
+  function renderLeaderboard() {
+    if (!$('hc-top-donor-name')) return;
+    if (topDonator) {
+      $('hc-top-donor-name').textContent   = safeText(topDonator.name,'Anonymous');
+      $('hc-top-donor-amount').textContent = formatAmount(topDonator.totalAmount,'INR');
+    } else {
+      $('hc-top-donor-name').textContent   = 'No donations yet';
+      $('hc-top-donor-amount').textContent = '₹0';
+    }
+    var recent = latestDonations[recentDonationIndex];
+    if (recent) {
+      $('hc-recent-donor-name').textContent   = safeText(recent.name,'Anonymous');
+      $('hc-recent-donor-amount').textContent = formatAmount(recent.amount,recent.currency);
+    } else {
+      $('hc-recent-donor-name').textContent   = 'No recent donations';
+      $('hc-recent-donor-amount').textContent = '₹0';
+    }
+  }
+
+  function setLeaderboardData(data) {
+    topDonator      = (data&&data.topDonator)?data.topDonator:null;
+    latestDonations = Array.isArray(data&&data.latestDonations)
+      ? data.latestDonations.map(normalizeDonation).filter(Boolean).slice(0,5) : [];
+    recentDonationIndex = 0;
+    renderLeaderboard();
+  }
+
+  async function fetchLeaderboard() {
+    try {
+      var res = await fetch(LEADERBOARD_ENDPOINT, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({streamerSlug:STREAMER_SLUG}),
+      });
+      if (!res.ok) return;
+      setLeaderboardData(await res.json());
+    } catch(err){ console.error('[HyperChat] LB error:',err); }
+  }
+
+  function rotateRecentDonation() {
+    if (latestDonations.length<=1) return;
+    var row = $('hc-recent-donation');
+    if (!row) return;
+    row.classList.add('hc-changing');
+    setTimeout(function(){
+      recentDonationIndex=(recentDonationIndex+1)%latestDonations.length;
+      renderLeaderboard();
+      row.classList.remove('hc-changing');
+    },260);
+  }
+
+  function applyLeaderboardUpdate(data) {
+    if (data&&data.topDonator) topDonator=data.topDonator;
+    if (data&&data.latestDonation) {
+      var n=normalizeDonation(data.latestDonation);
+      if (n){
+        latestDonations=[n,...latestDonations.filter(function(i){return i.id!==n.id;})].slice(0,5);
+        recentDonationIndex=0;
+      }
+    }
+    renderLeaderboard();
+  }
+
+  function connectRealtime() {
+    var pusher    = new Pusher(PUSHER_KEY, {cluster:PUSHER_CLUSTER});
+    var alerts    = pusher.subscribe(ALERT_CHANNEL);
+    var dashboard = pusher.subscribe(DASHBOARD_CHANNEL);
+
+    alerts.bind('pusher:subscription_succeeded', function(){
+      console.log('[HyperChat] Connected to', ALERT_CHANNEL);
+    });
+    alerts.bind(ALERT_EVENT, function(d){
+      console.log('[HyperChat] Alert received:', JSON.stringify(d));
+      enqueueAlert(d);
+    });
+    dashboard.bind('pusher:subscription_succeeded', function(){
+      console.log('[HyperChat] Connected to', DASHBOARD_CHANNEL);
+    });
+    dashboard.bind('leaderboard-updated', function(d){
+      applyLeaderboardUpdate(d);
+    });
+  }
+
+  function loadPusherScript(callback) {
+    if (window.Pusher){ callback(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://js.pusher.com/8.4.0/pusher.min.js';
+    s.onload = callback;
+    s.onerror = function(){ console.error('[HyperChat] Failed to load Pusher.'); };
+    document.head.appendChild(s);
+  }
+
+  function testAlert() {
+    enqueueAlert({
+      id:'test-'+Date.now(), name:'Test Viewer',
+      amount:100, currency:'INR', message:'Macdaking alert test',
+    });
+    applyLeaderboardUpdate({
+      topDonator:{name:'Top Test',totalAmount:2500},
+      latestDonation:{id:'lb-test-'+Date.now(),name:'Recent Test',amount:100,currency:'INR',created_at:new Date().toISOString()},
+    });
+  }
+
+  window.HyperChatMacdaking = {testAlert, fetchLeaderboard, saveLayout, loadLayout};
+  console.log('[HyperChat] Macdaking alerts loaded. Test: HyperChatMacdaking.testAlert()');
+
+  renderLeaderboard();
+  fetchLeaderboard();
+  loadPusherScript(connectRealtime);
+  setInterval(fetchLeaderboard, LEADERBOARD_REFRESH_MS);
+  setInterval(rotateRecentDonation, LEADERBOARD_ROTATE_MS);
+
+})();
+</script>
+</body>
+</html>
