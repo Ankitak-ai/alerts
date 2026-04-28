@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>HyperChat Debug — Macdaking</title>
+  <style>
+    html, body {
+      margin: 0; padding: 16px;
+      background: rgba(0,0,0,0.88);
+      font-family: monospace;
+      font-size: 13px;
+      color: #fff;
+      width: 100%; height: 100%;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    h2 { margin: 0 0 12px; font-size: 14px; color: #ff6b6b; letter-spacing: 0.1em; }
+    .row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 10px; margin-bottom: 6px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.05);
+    }
+    .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      flex-shrink: 0;
+      background: #444;
+    }
+    .dot.ok  { background: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
+    .dot.err { background: #e74c3c; box-shadow: 0 0 8px #e74c3c; }
+    .dot.pending { background: #f39c12; box-shadow: 0 0 8px #f39c12; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .label { flex: 1; }
+    .detail { font-size: 11px; color: rgba(255,255,255,0.5); word-break: break-all; }
+    #log {
+      margin-top: 12px;
+      padding: 8px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 6px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.7);
+      max-height: 160px;
+      overflow: hidden;
+    }
+    .log-line { margin-bottom: 3px; }
+    .log-line.err { color: #e74c3c; }
+    .log-line.ok  { color: #2ecc71; }
+  </style>
+</head>
+<body>
+  <h2>🔍 HYPERCHAT DEBUG — MACDAKING</h2>
+
+  <div class="row" id="row-network">
+    <div class="dot pending" id="dot-network"></div>
+    <div class="label">Network / Supabase reachable</div>
+    <div class="detail" id="detail-network">checking…</div>
+  </div>
+
+  <div class="row" id="row-leaderboard">
+    <div class="dot pending" id="dot-leaderboard"></div>
+    <div class="label">Leaderboard endpoint</div>
+    <div class="detail" id="detail-leaderboard">waiting…</div>
+  </div>
+
+  <div class="row" id="row-pusher-cfg">
+    <div class="dot pending" id="dot-pusher-cfg"></div>
+    <div class="label">Pusher config endpoint</div>
+    <div class="detail" id="detail-pusher-cfg">waiting…</div>
+  </div>
+
+  <div class="row" id="row-pusher-conn">
+    <div class="dot pending" id="dot-pusher-conn"></div>
+    <div class="label">Pusher connection</div>
+    <div class="detail" id="detail-pusher-conn">waiting…</div>
+  </div>
+
+  <div class="row" id="row-audio">
+    <div class="dot pending" id="dot-audio"></div>
+    <div class="label">Audio endpoint</div>
+    <div class="detail" id="detail-audio">waiting…</div>
+  </div>
+
+  <div id="log"></div>
+
+<script>
+(function() {
+  const SUPABASE    = 'https://vsevsjvtrshgeiudrnth.supabase.co';
+  const LB_EP       = SUPABASE + '/functions/v1/get-leaderboard-data';
+  const PUSHER_EP   = SUPABASE + '/functions/v1/get-pusher-config';
+  const AUDIO_EP    = SUPABASE + '/functions/v1/get-current-audio';
+  const OBS_TOKEN   = 'obs_tfan5bkyt2hse6870aked';
+  const SLUG        = 'macdaking';
+
+  function setStatus(id, status, detail) {
+    const dot = document.getElementById('dot-' + id);
+    const det = document.getElementById('detail-' + id);
+    dot.className = 'dot ' + status;
+    if (det && detail !== undefined) det.textContent = detail;
+  }
+
+  function log(msg, type) {
+    const el = document.getElementById('log');
+    const line = document.createElement('div');
+    line.className = 'log-line' + (type ? ' ' + type : '');
+    line.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+    el.appendChild(line);
+    // keep last 12 lines
+    while (el.children.length > 12) el.removeChild(el.firstChild);
+  }
+
+  // 1. Basic network
+  fetch(SUPABASE + '/functions/v1/get-leaderboard-data', { method: 'OPTIONS' })
+    .then(() => { setStatus('network', 'ok', 'reachable'); log('Supabase reachable', 'ok'); })
+    .catch(e => { setStatus('network', 'err', e.message); log('Supabase unreachable: ' + e.message, 'err'); });
+
+  // 2. Leaderboard
+  fetch(LB_EP, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ streamerSlug: SLUG }),
+  })
+    .then(async r => {
+      const text = await r.text();
+      if (r.ok) {
+        setStatus('leaderboard', 'ok', 'HTTP ' + r.status + ' — got data');
+        log('Leaderboard OK: ' + text.slice(0, 80), 'ok');
+      } else {
+        setStatus('leaderboard', 'err', 'HTTP ' + r.status + ': ' + text.slice(0, 60));
+        log('Leaderboard error ' + r.status + ': ' + text.slice(0, 80), 'err');
+      }
+    })
+    .catch(e => { setStatus('leaderboard', 'err', e.message); log('Leaderboard fetch failed: ' + e.message, 'err'); });
+
+  // 3. Pusher config
+  fetch(PUSHER_EP, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ streamer_slug: SLUG }),
+  })
+    .then(async r => {
+      const text = await r.text();
+      if (r.ok) {
+        let cfg; try { cfg = JSON.parse(text); } catch(e) { cfg = null; }
+        if (cfg && cfg.key && cfg.cluster) {
+          setStatus('pusher-cfg', 'ok', 'key: ' + cfg.key.slice(0,6) + '… cluster: ' + cfg.cluster);
+          log('Pusher config OK', 'ok');
+          // 4. Pusher connection
+          connectPusher(cfg);
+        } else {
+          setStatus('pusher-cfg', 'err', 'bad response: ' + text.slice(0,60));
+          log('Pusher config bad JSON: ' + text.slice(0,80), 'err');
+        }
+      } else {
+        setStatus('pusher-cfg', 'err', 'HTTP ' + r.status + ': ' + text.slice(0,60));
+        log('Pusher config error ' + r.status, 'err');
+      }
+    })
+    .catch(e => { setStatus('pusher-cfg', 'err', e.message); log('Pusher config fetch failed: ' + e.message, 'err'); });
+
+  // 5. Audio
+  const audio = new Audio(AUDIO_EP + '?token=' + encodeURIComponent(OBS_TOKEN) + '&t=' + Date.now());
+  audio.oncanplaythrough = () => { setStatus('audio', 'ok', 'audio ready'); log('Audio endpoint responded', 'ok'); };
+  audio.onerror = (e) => {
+    const codes = ['ABORTED','NETWORK','DECODE','SRC_NOT_SUPPORTED'];
+    const code = audio.error ? (codes[audio.error.code-1]||audio.error.code) : 'unknown';
+    setStatus('audio', 'err', 'error: ' + code);
+    log('Audio error: ' + code, 'err');
+  };
+  // 204/no content = no audio queued = that's fine
+  fetch(AUDIO_EP + '?token=' + encodeURIComponent(OBS_TOKEN) + '&t=' + Date.now())
+    .then(r => {
+      if (r.status === 204 || r.status === 200) {
+        setStatus('audio', 'ok', 'endpoint reachable (HTTP ' + r.status + ')');
+        log('Audio endpoint HTTP ' + r.status, 'ok');
+      } else {
+        setStatus('audio', 'err', 'HTTP ' + r.status);
+        log('Audio endpoint HTTP ' + r.status, 'err');
+      }
+    })
+    .catch(e => { setStatus('audio', 'err', e.message); log('Audio fetch failed: ' + e.message, 'err'); });
+
+  function connectPusher(cfg) {
+    setStatus('pusher-conn', 'pending', 'connecting…');
+    const s = document.createElement('script');
+    s.src = 'https://js.pusher.com/8.4.0/pusher.min.js';
+    s.onload = function() {
+      try {
+        const p = new Pusher(cfg.key, { cluster: cfg.cluster });
+        p.connection.bind('connected', () => {
+          setStatus('pusher-conn', 'ok', 'connected ✓');
+          log('Pusher connected!', 'ok');
+        });
+        p.connection.bind('failed', () => {
+          setStatus('pusher-conn', 'err', 'connection failed');
+          log('Pusher connection failed', 'err');
+        });
+        p.connection.bind('error', e => {
+          setStatus('pusher-conn', 'err', JSON.stringify(e).slice(0,60));
+          log('Pusher error: ' + JSON.stringify(e).slice(0,60), 'err');
+        });
+        setTimeout(() => {
+          if (p.connection.state !== 'connected') {
+            setStatus('pusher-conn', 'err', 'timeout — state: ' + p.connection.state);
+            log('Pusher timeout, state: ' + p.connection.state, 'err');
+          }
+        }, 8000);
+      } catch(e) {
+        setStatus('pusher-conn', 'err', e.message);
+        log('Pusher init error: ' + e.message, 'err');
+      }
+    };
+    s.onerror = () => {
+      setStatus('pusher-conn', 'err', 'failed to load pusher.js');
+      log('Failed to load pusher.js (no internet?)', 'err');
+    };
+    document.head.appendChild(s);
+  }
+
+  log('Debug started…');
+})();
+</script>
+</body>
+</html>
