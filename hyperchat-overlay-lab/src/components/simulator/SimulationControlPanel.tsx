@@ -1,11 +1,29 @@
 import React, { useState, useEffect } from 'react';
+import { useOverlayStore } from '@/store/overlayStore';
+import { simulator } from '@/mocks/eventSimulator';
+import { Button } from '@/components/ui/Button';
+import { Switch } from '@/components/ui/Switch';
+import { Slider } from '@/components/ui/Slider';
+import { Settings, Eye, Bug, Gift, TrendingUp, Zap, Activity, Monitor, Trash2 } from 'lucide-react';
 
 type TimerId = ReturnType<typeof setInterval>;
 
 export const SimulationControlPanel: React.FC = () => {
+  const {
+    addAlert,
+    clearAllAlerts,
+    simulationSettings,
+    updateSimulationSettings,
+    isPreviewMode,
+    isDebugMode,
+    togglePreviewMode,
+    toggleDebugMode,
+    metrics,
+  } = useOverlayStore();
+  
   const [isAutoGenerating, setIsAutoGenerating] = useState(false);
   const [autoGenerateInterval, setAutoGenerateInterval] = useState<TimerId | null>(null);
-
+  
   const handleSingleDonation = () => {
     const event = simulator.generateAlertEvent();
     addAlert({
@@ -15,7 +33,7 @@ export const SimulationControlPanel: React.FC = () => {
       duration: event.duration,
     });
   };
-
+  
   const handleBurst = () => {
     const events = simulator.generateBurst(simulationSettings.burstCount);
     events.forEach(event => {
@@ -27,7 +45,7 @@ export const SimulationControlPanel: React.FC = () => {
       });
     });
   };
-
+  
   const handleSpam = () => {
     const events = simulator.generateSpam(20);
     events.forEach(event => {
@@ -39,7 +57,7 @@ export const SimulationControlPanel: React.FC = () => {
       });
     });
   };
-
+  
   const handleLargeDonation = () => {
     const event = simulator.generateLargeDonation();
     addAlert({
@@ -49,7 +67,7 @@ export const SimulationControlPanel: React.FC = () => {
       duration: event.duration,
     });
   };
-
+  
   const toggleAutoGenerate = () => {
     if (isAutoGenerating) {
       if (autoGenerateInterval) {
