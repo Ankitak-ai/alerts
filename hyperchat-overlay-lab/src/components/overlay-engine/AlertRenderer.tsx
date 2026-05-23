@@ -78,6 +78,12 @@ export const AlertRenderer: React.FC<AlertRendererProps> = ({ alert, variant }) 
         return <TerminalAlert alert={alert} />;
       case 'esports':
         return <EsportsAlert alert={alert} />;
+      case 'ai-assistant':
+        return <AiAssistantAlert alert={alert} />;
+      case 'rgb-gaming':
+        return <RgbGamingAlert alert={alert} />;
+      case 'cinematic':
+        return <CinematicAlert alert={alert} />;
       default:
         return <DefaultAlert alert={alert} />;
     }
@@ -324,6 +330,99 @@ const EsportsAlert: React.FC<{ alert: AlertEvent }> = ({ alert }) => {
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// AI Assistant Alert Variant
+const AiAssistantAlert: React.FC<{ alert: AlertEvent }> = ({ alert }) => {
+  if (alert.type !== 'donation') return null;
+  const data = alert.data as any;
+
+  return (
+    <div className="rounded-2xl p-4 min-w-[340px] bg-gradient-to-br from-blue-900/90 via-indigo-900/90 to-purple-900/90 border border-blue-400/30 shadow-lg shadow-blue-500/20">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+        <span className="text-blue-300 text-xs uppercase tracking-wider">AI Notification</span>
+      </div>
+      <div className="flex items-start gap-3">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+          {data.donorName?.[0]?.toUpperCase() || '?'}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-white truncate">{data.donorName}</span>
+            <span className="text-blue-300 font-bold">${data.amount}</span>
+          </div>
+          <p className="text-blue-100/80 text-sm mt-1">{data.message}</p>
+          {data.mediaUrl && (
+            <div className="mt-2 rounded-xl overflow-hidden border border-blue-400/30">
+              <img src={data.mediaUrl} alt="Media" className="max-h-32 w-full object-cover" />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// RGB Gaming Alert Variant
+const RgbGamingAlert: React.FC<{ alert: AlertEvent }> = ({ alert }) => {
+  if (alert.type !== 'donation') return null;
+  const data = alert.data as any;
+
+  return (
+    <div className="rounded-lg p-4 min-w-[360px] bg-slate-900/95 border-2 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-green-500 to-blue-500 animate-pulse opacity-50" />
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-3">
+          <span className="bg-gradient-to-r from-red-500 via-green-500 to-blue-500 text-white font-bold text-xs px-3 py-1 rounded">GAME ON</span>
+          <span className="text-green-400 font-bold text-xl">${data.amount}</span>
+        </div>
+        <div className="flex items-start gap-3">
+          <div className="w-14 h-14 rounded-lg bg-gradient-to-r from-red-500 via-green-500 to-blue-500 flex items-center justify-center text-white font-bold text-xl ring-4 ring-slate-900">
+            {data.donorName?.[0]?.toUpperCase() || '?'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-white font-bold truncate text-lg">{data.donorName}</div>
+            <p className="text-gray-300 text-sm mt-1">{data.message}</p>
+            {data.mediaUrl && (
+              <div className="mt-2 rounded border-2 border-slate-700 overflow-hidden">
+                <img src={data.mediaUrl} alt="Media" className="max-h-28 w-full object-cover" />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Cinematic Alert Variant
+const CinematicAlert: React.FC<{ alert: AlertEvent }> = ({ alert }) => {
+  if (alert.type !== 'donation') return null;
+  const data = alert.data as any;
+
+  return (
+    <div className="rounded-lg p-6 min-w-[400px] bg-gradient-to-b from-slate-800 via-slate-900 to-black border border-slate-700 shadow-2xl">
+      <div className="text-center mb-4">
+        <div className="text-slate-400 text-xs uppercase tracking-[0.3em] mb-2">Generous Support</div>
+        <div className="text-3xl font-light text-white">${data.amount}</div>
+      </div>
+      <div className="flex items-center gap-4 pt-4 border-t border-slate-700">
+        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center text-white font-medium">
+          {data.donorName?.[0]?.toUpperCase() || '?'}
+        </div>
+        <div className="flex-1">
+          <div className="text-slate-300 font-medium">{data.donorName}</div>
+          <p className="text-slate-500 text-sm mt-0.5 line-clamp-1">{data.message}</p>
+        </div>
+        {data.mediaUrl && (
+          <div className="w-16 h-16 rounded overflow-hidden border border-slate-600">
+            <img src={data.mediaUrl} alt="Media" className="w-full h-full object-cover" />
+          </div>
+        )}
       </div>
     </div>
   );
